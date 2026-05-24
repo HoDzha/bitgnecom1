@@ -39,17 +39,23 @@ def safe_console_text(text: str) -> str:
     return text.encode(encoding, errors="replace").decode(encoding, errors="replace")
 
 
+def console_print(*args, **kwargs) -> None:
+    kwargs.setdefault("flush", True)
+    print(*args, **kwargs)
+
+
 def main() -> None:
     task_filter = os.sys.argv[1:]
     scores: list[tuple[str, float]] = []
+    failed_tasks: list[str] = []
     log_manager = RunLogManager()
 
     if not BITGN_API_KEY:
-        print(f"{CLI_RED}BITGN_API_KEY is missing{CLI_CLR}")
+        console_print(f"{CLI_RED}BITGN_API_KEY is missing{CLI_CLR}")
         return
 
     if not has_model_credentials():
-        print(
+        console_print(
             f"{CLI_RED}Model credentials are missing. "
             "For codex_oauth, run `codex login`. For openai_sdk, set OPENAI credentials."
             f"{CLI_CLR}"
@@ -59,14 +65,15 @@ def main() -> None:
     try:
         validate_model_configuration()
     except RuntimeError as exc:
-        print(f"{CLI_RED}{safe_console_text(str(exc))}{CLI_CLR}")
+        console_print(f"{CLI_RED}{safe_console_text(str(exc))}{CLI_CLR}")
         return
 
     try:
         client = HarnessServiceClientSync(BITGN_URL)
-        print("Connecting to BitGN", client.status(StatusRequest()))
-        print(f"Model auth source: {describe_model_auth_source()}")
-        print(f"Resolved model id: {get_model_id()}")
+        console_print("Connecting to BitGN", client.status(StatusRequest()))
+        console_print(f"Model auth source: {describe_model_auth_source()}")
+        console_print(f"Resolved model id: {get_model_id()}")
+        console_print(f"Run logs: {log_manager.session_dir}")
         log_manager.run_log.log(f"Model auth source: {describe_model_auth_source()}")
         log_manager.run_log.log(f"Resolved model id: {get_model_id()}")
 
@@ -75,7 +82,7 @@ def main() -> None:
             f"{EvalPolicy.Name(benchmark.policy)} benchmark: {benchmark.benchmark_id} "
             f"with {len(benchmark.tasks)} tasks.\n{CLI_GREEN}{benchmark.description}{CLI_CLR}"
         )
-        print(benchmark_line)
+        console_print(benchmark_line)
         log_manager.run_log.log(benchmark_line)
 
         run = client.start_run(
@@ -85,55 +92,70 @@ def main() -> None:
                 api_key=BITGN_API_KEY,
             )
         )
+        console_print(f"Run started: {run.run_id}")
+        log_manager.run_log.log(f"Run started: {run.run_id}")
 
         try:
             for trial_id in run.trial_ids:
+                console_print(f"Preparing trial: {trial_id}")
                 trial = client.start_trial(StartTrialRequest(trial_id=trial_id))
                 if task_filter and trial.task_id not in task_filter:
+                    console_print(f"Skipping task {trial.task_id}: not in CLI filter")
                     continue
 
                 task_header = f"{'=' * 28} Starting task: {trial.task_id} {'=' * 28}"
                 task_body = f"{CLI_BLUE}{trial.instruction}{CLI_CLR}\n{'-' * 80}"
-                print(task_header)
-                print(task_body)
+                console_print(task_header)
+                console_print(task_body)
+                console_print(f"Task log: {log_manager.session_dir / f'{trial.task_id}.log'}")
                 task_logger = log_manager.task_logger(trial.task_id)
                 task_logger.log(task_header)
                 task_logger.log(task_body)
 
                 try:
+                    console_print(f"Running agent for {trial.task_id}...")
                     run_agent(get_model_id(), trial.harness_url, trial.instruction, logger=task_logger)
                 except Exception as exc:
                     rendered = safe_console_text(f"{CLI_RED}{exc}{CLI_CLR}")
-                    print(rendered)
+                    console_print(rendered)
                     task_logger.log(rendered)
 
+                console_print(f"Waiting for score for {trial.task_id}...")
                 result = client.end_trial(EndTrialRequest(trial_id=trial.trial_id))
                 if result.score_available:
                     scores.append((trial.task_id, result.score))
+                    if result.score != 1:
+                        failed_tasks.append(trial.task_id)
                     style = CLI_GREEN if result.score == 1 else CLI_RED
                     explain = textwrap.indent("\n".join(result.score_detail), " ")
                     score_text = f"\n{style}Score: {result.score:0.2f}\n{explain}\n{CLI_CLR}"
-                    print(score_text)
+                    console_print(score_text)
                     task_logger.log(score_text)
                     log_manager.run_log.log(f"{trial.task_id}: {result.score:0.2f}")
                 else:
-                    print(f"\n{CLI_BLUE}Score: not available{CLI_CLR}\n")
+                    console_print(f"\n{CLI_BLUE}Score: not available{CLI_CLR}\n")
                     task_logger.log(f"\n{CLI_BLUE}Score: not available{CLI_CLR}\n")
         finally:
             client.submit_run(SubmitRunRequest(run_id=run.run_id, force=True))
 
     except ConnectError as exc:
-        print(f"{exc.code}: {exc.message}")
+        console_print(f"{exc.code}: {exc.message}")
     except KeyboardInterrupt:
-        print(f"{CLI_RED}Interrupted{CLI_CLR}")
+        console_print(f"{CLI_RED}Interrupted{CLI_CLR}")
 
     if scores:
         for task_id, score in scores:
             style = CLI_GREEN if score == 1 else CLI_RED
-            print(f"{task_id}: {style}{score:0.2f}{CLI_CLR}")
+            console_print(f"{task_id}: {style}{score:0.2f}{CLI_CLR}")
             log_manager.run_log.log(f"{task_id}: {score:0.2f}")
+        if failed_tasks:
+            failed_line = f"Failed tasks: {', '.join(failed_tasks)}"
+        else:
+            failed_line = "Failed tasks: none"
+        console_print(failed_line)
+        log_manager.run_log.log(failed_line)
         total = sum(score for _, score in scores) / len(scores) * 100.0
-        print(f"FINAL: {total:0.2f}%")
+        console_print(f"FINAL: {total:0.2f}%")
         log_manager.run_log.log(f"FINAL: {total:0.2f}%")
 
 

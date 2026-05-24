@@ -615,7 +615,7 @@ def _clarification_probe_command() -> ReqExec:
 
 
 def emit(message: str, logger: TaskLogger | None = None) -> None:
-    print(message)
+    print(message, flush=True)
     if logger is not None:
         logger.log(message)
 
@@ -653,6 +653,7 @@ def run_agent(model: str, harness_url: str, task_text: str, logger: TaskLogger |
     for index in range(40):
         step_id = f"step_{index + 1}"
         started = time.time()
+        emit(f"{CLI_BLUE}MODEL{CLI_CLR}: requesting {step_id}", logger)
         job = client.parse_structured(
             messages=log,
             response_model=NextStep,
@@ -692,6 +693,8 @@ def run_agent(model: str, harness_url: str, task_text: str, logger: TaskLogger |
         _append_tool_trace(log, step_id, summary, tool_call)
 
         try:
+            if not isinstance(tool_call, ReportTaskCompletion):
+                emit(f"{CLI_BLUE}TOOL{CLI_CLR}: dispatching {tool_call.tool}", logger)
             result = dispatch(vm, tool_call)
             text = _format_result(tool_call, result) if not isinstance(tool_call, ReportTaskCompletion) else "{}"
             if not isinstance(tool_call, ReportTaskCompletion):
@@ -716,6 +719,7 @@ def run_agent(model: str, harness_url: str, task_text: str, logger: TaskLogger |
 
         if isinstance(tool_call, ReportTaskCompletion):
             status = CLI_GREEN if tool_call.outcome == "OUTCOME_OK" else CLI_YELLOW
+            emit(f"{CLI_BLUE}COMPLETE{CLI_CLR}: submitting final answer", logger)
             emit(f"{status}agent {tool_call.outcome}{CLI_CLR}", logger)
             emit("Summary:", logger)
             for item in tool_call.completed_steps_laconic:
