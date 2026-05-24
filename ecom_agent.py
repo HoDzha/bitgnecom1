@@ -37,6 +37,7 @@ CLI_GREEN = "\x1B[32m"
 CLI_YELLOW = "\x1B[33m"
 CLI_BLUE = "\x1B[34m"
 CLI_CLR = "\x1B[0m"
+DEFAULT_MODEL_MAX_COMPLETION_TOKENS = 4096
 
 
 class ReportTaskCompletion(BaseModel):
@@ -290,6 +291,7 @@ Core operating rules:
 - If the task cannot be finished because key evidence is missing, prefer `OUTCOME_NONE_CLARIFICATION`.
 - If the task asks for unsupported capability, prefer `OUTCOME_NONE_UNSUPPORTED`.
 - Every final answer must use `report_completion`.
+- Keep responses concise and schema-focused; do not spend tokens on long narration.
 - Include grounding references to the files or commands that justify your answer.
 - For shopper yes/no catalogue questions, do not choose clarification before at least one concrete catalogue lookup.
 - For shopper count or cross-store availability questions, do not choose clarification before at least one concrete catalogue or inventory lookup.
@@ -797,6 +799,9 @@ def run_agent(model: str, harness_url: str, task_text: str, logger: TaskLogger |
     client = create_structured_model_client()
     vm = EcomRuntimeClientSync(harness_url)
     tracker = EvidenceTracker()
+    max_completion_tokens = int(
+        os.getenv("MODEL_MAX_COMPLETION_TOKENS") or DEFAULT_MODEL_MAX_COMPLETION_TOKENS
+    )
     log: list[dict] = [{"role": "system", "content": system_prompt}]
     if logger is not None:
         logger.log_json({"event": "task_start", "workflow": workflow, "task_text": task_text})
@@ -829,7 +834,7 @@ def run_agent(model: str, harness_url: str, task_text: str, logger: TaskLogger |
             messages=log,
             response_model=NextStep,
             model=model,
-            max_completion_tokens=16384,
+            max_completion_tokens=max_completion_tokens,
         )
         elapsed_ms = int((time.time() - started) * 1000)
         summary = job.plan_remaining_steps_brief[0]
