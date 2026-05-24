@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import textwrap
 
 from bitgn.harness_connect import HarnessServiceClientSync
@@ -17,7 +18,12 @@ from connectrpc.errors import ConnectError
 
 from ecom_agent import CLI_BLUE, CLI_CLR, CLI_GREEN, CLI_RED, run_agent
 from env_utils import load_dotenv
-from openai_client import describe_openai_auth_source, has_openai_credentials
+from model_client import (
+    describe_model_auth_source,
+    get_model_id,
+    has_model_credentials,
+    validate_model_configuration,
+)
 from runtime_logging import RunLogManager
 
 load_dotenv()
@@ -25,8 +31,12 @@ load_dotenv()
 BITGN_URL = os.getenv("BITGN_HOST") or os.getenv("BENCHMARK_HOST") or "https://api.bitgn.com"
 BITGN_API_KEY = os.getenv("BITGN_API_KEY") or ""
 BENCH_ID = os.getenv("BENCH_ID") or os.getenv("BENCHMARK_ID") or "bitgn/ecom1-dev"
-MODEL_ID = os.getenv("MODEL_ID") or "gpt-5.4"
 RUN_NAME = os.getenv("RUN_NAME") or "ECOM1 Rails Agent"
+
+
+def safe_console_text(text: str) -> str:
+    encoding = sys.stdout.encoding or "utf-8"
+    return text.encode(encoding, errors="replace").decode(encoding, errors="replace")
 
 
 def main() -> None:
@@ -38,19 +48,27 @@ def main() -> None:
         print(f"{CLI_RED}BITGN_API_KEY is missing{CLI_CLR}")
         return
 
-    if not has_openai_credentials():
+    if not has_model_credentials():
         print(
-            f"{CLI_RED}OpenAI credentials are missing. "
-            "Set OPENAI_ACCESS_TOKEN or OPENAI_API_KEY, or store one in Windows Credential Manager."
+            f"{CLI_RED}Model credentials are missing. "
+            "For codex_oauth, run `codex login`. For openai_sdk, set OPENAI credentials."
             f"{CLI_CLR}"
         )
         return
 
     try:
+        validate_model_configuration()
+    except RuntimeError as exc:
+        print(f"{CLI_RED}{safe_console_text(str(exc))}{CLI_CLR}")
+        return
+
+    try:
         client = HarnessServiceClientSync(BITGN_URL)
         print("Connecting to BitGN", client.status(StatusRequest()))
-        print(f"OpenAI auth source: {describe_openai_auth_source()}")
-        log_manager.run_log.log(f"OpenAI auth source: {describe_openai_auth_source()}")
+        print(f"Model auth source: {describe_model_auth_source()}")
+        print(f"Resolved model id: {get_model_id()}")
+        log_manager.run_log.log(f"Model auth source: {describe_model_auth_source()}")
+        log_manager.run_log.log(f"Resolved model id: {get_model_id()}")
 
         benchmark = client.get_benchmark(GetBenchmarkRequest(benchmark_id=BENCH_ID))
         benchmark_line = (
@@ -83,10 +101,11 @@ def main() -> None:
                 task_logger.log(task_body)
 
                 try:
-                    run_agent(MODEL_ID, trial.harness_url, trial.instruction, logger=task_logger)
+                    run_agent(get_model_id(), trial.harness_url, trial.instruction, logger=task_logger)
                 except Exception as exc:
-                    print(f"{CLI_RED}{exc}{CLI_CLR}")
-                    task_logger.log(f"{CLI_RED}{exc}{CLI_CLR}")
+                    rendered = safe_console_text(f"{CLI_RED}{exc}{CLI_CLR}")
+                    print(rendered)
+                    task_logger.log(rendered)
 
                 result = client.end_trial(EndTrialRequest(trial_id=trial.trial_id))
                 if result.score_available:

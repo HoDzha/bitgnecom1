@@ -29,7 +29,7 @@ from connectrpc.errors import ConnectError
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field
 
-from openai_client import create_openai_client
+from model_client import create_structured_model_client
 from runtime_logging import TaskLogger
 
 CLI_RED = "\x1B[31m"
@@ -283,6 +283,8 @@ Core operating rules:
 - If the task asks for unsupported capability, prefer `OUTCOME_NONE_UNSUPPORTED`.
 - Every final answer must use `report_completion`.
 - Include grounding references to the files or commands that justify your answer.
+- For shopper yes/no catalogue questions, do not choose clarification before at least one concrete catalogue lookup.
+- If `/bin/sql` can answer the question from catalogue state, use it before asking for clarification.
 
 Suggested first moves:
 - inspect `/AGENTS.MD`
@@ -583,6 +585,35 @@ def _enrich_completion_refs(
     return normalized.model_copy(update={"grounding_refs": valid_refs[:20]})
 
 
+def _has_catalog_attempt(log: list[dict]) -> bool:
+    for item in log:
+        if item.get("role") != "tool":
+            continue
+        content = item.get("content", "")
+        if not isinstance(content, str):
+            continue
+        lowered = content.lower()
+        if "/bin/sql" in lowered or "/proc/catalog" in lowered:
+            return True
+    return False
+
+
+def _is_binary_catalog_question(task_text: str, workflow: str) -> bool:
+    if workflow != "shopper":
+        return False
+    lowered = task_text.lower().strip()
+    return lowered.startswith("do you have") or lowered.startswith("is there") or lowered.startswith("are there")
+
+
+def _clarification_probe_command() -> ReqExec:
+    return ReqExec(
+        tool="exec",
+        path="/bin/sql",
+        args=[],
+        stdin="select name, sql from sqlite_schema where sql is not null order by type, name;",
+    )
+
+
 def emit(message: str, logger: TaskLogger | None = None) -> None:
     print(message)
     if logger is not None:
@@ -592,7 +623,7 @@ def emit(message: str, logger: TaskLogger | None = None) -> None:
 def run_agent(model: str, harness_url: str, task_text: str, logger: TaskLogger | None = None) -> None:
     workflow = classify_workflow(task_text)
     system_prompt = build_system_prompt(task_text, workflow)
-    client = create_openai_client()
+    client = create_structured_model_client()
     vm = EcomRuntimeClientSync(harness_url)
     tracker = EvidenceTracker()
     log: list[dict] = [{"role": "system", "content": system_prompt}]
@@ -622,14 +653,13 @@ def run_agent(model: str, harness_url: str, task_text: str, logger: TaskLogger |
     for index in range(40):
         step_id = f"step_{index + 1}"
         started = time.time()
-        resp = client.beta.chat.completions.parse(
-            model=model,
-            response_format=NextStep,
+        job = client.parse_structured(
             messages=log,
+            response_model=NextStep,
+            model=model,
             max_completion_tokens=16384,
         )
         elapsed_ms = int((time.time() - started) * 1000)
-        job = resp.choices[0].message.parsed
         summary = job.plan_remaining_steps_brief[0]
         tool_call = job.function
 
@@ -647,6 +677,16 @@ def run_agent(model: str, harness_url: str, task_text: str, logger: TaskLogger |
             )
 
         if isinstance(tool_call, ReportTaskCompletion):
+            if (
+                tool_call.outcome == "OUTCOME_NONE_CLARIFICATION"
+                and _is_binary_catalog_question(task_text, workflow)
+                and not _has_catalog_attempt(log)
+            ):
+                emit(
+                    f"{CLI_YELLOW}Guard: replacing early clarification with a mandatory SQL probe{CLI_CLR}",
+                    logger,
+                )
+                tool_call = _clarification_probe_command()
             tool_call = _enrich_completion_refs(vm, tool_call, tracker)
 
         _append_tool_trace(log, step_id, summary, tool_call)
