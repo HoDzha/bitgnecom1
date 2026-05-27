@@ -1166,6 +1166,19 @@ def _extract_product_kind_phrase(task_text: str) -> str | None:
     return match.group(1).strip().strip('"').strip()
 
 
+def _render_count_message(task_text: str, value: str) -> str:
+    lowered = task_text.lower()
+    if re.search(r"<\s*qty\s*:", lowered):
+        return f"<QTY: {value}>"
+    if re.search(r"<\s*count\s*:", lowered):
+        return f"<COUNT: {value}>"
+    if re.search(r"\[\s*qty\s*:", lowered):
+        return f"[QTY:{value}]"
+    if re.search(r"\[\s*total\s*:", lowered):
+        return f"[total:{value}]"
+    return value
+
+
 def _discover_count_policy_profiles(vm: EcomRuntimeClientSync) -> list[dict[str, str]]:
     roots = [
         "/docs/current-updates",

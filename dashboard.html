@@ -330,7 +330,7 @@
         Автогенерируемый дашборд по локальным логам. Показывает текущий статус benchmark, структуру рантайма агента, динамику full-runs и ближайшие инженерные шаги.
       </div>
       <div class="meta">
-        <div class="meta-chip">Latest full run: 2026-05-27T17-02-48Z</div>
+        <div class="meta-chip">Latest full run: 2026-05-27T17-45-43Z</div>
         <div class="meta-chip">Model: gpt-5.3-codex</div>
         <div class="meta-chip">Auth: codex-cli:chatgpt-oauth</div>
         <div class="meta-chip">Benchmark size: 50</div>
@@ -344,19 +344,19 @@
         </article>
         <article class="stat">
           <div class="stat-label">Latest Full Pass</div>
-          <div class="stat-value">23/50</div>
-          <div class="bar"><span style="width:46.00%"></span></div>
+          <div class="stat-value">19/50</div>
+          <div class="bar"><span style="width:38.00%"></span></div>
           <div class="stat-note">Последний завершённый полный прогон benchmark.</div>
         </article>
         <article class="stat">
           <div class="stat-label">Open Failures</div>
-          <div class="stat-value">27</div>
-          <div class="stat-note">Неуспешные задачи в последнем full-run. Top list: t02, t07, t08, t09, t13, t14, t15, t16</div>
+          <div class="stat-value">31</div>
+          <div class="stat-note">Неуспешные задачи в последнем full-run. Top list: t01, t02, t07, t08, t13, t14, t15, t16</div>
         </article>
         <article class="stat">
           <div class="stat-label">Failure Mix</div>
-          <div class="stat-value">6</div>
-          <div class="stat-note">Ключевые паттерны: required refs: 11, other: 6, invalid refs: 4, outcome mismatch: 4</div>
+          <div class="stat-value">7</div>
+          <div class="stat-note">Ключевые паттерны: other: 10, required refs: 6, invalid refs: 4, security routing: 4</div>
         </article>
       </div>
     </section>
@@ -425,6 +425,14 @@
             <tbody>
               
         <tr>
+          <td>2026-05-27T17-45-43Z</td>
+          <td>19/48</td>
+          <td>t01, t02, t07, t08, t13, t14</td>
+          <td>other: 10, required refs: 6, invalid refs: 4</td>
+        </tr>
+        
+
+        <tr>
           <td>2026-05-27T17-02-48Z</td>
           <td>23/47</td>
           <td>t02, t07, t08, t09, t13, t14</td>
@@ -455,14 +463,6 @@
           <td>outcome mismatch: 8, required refs: 7, security routing: 6</td>
         </tr>
         
-
-        <tr>
-          <td>2026-05-26T21-05-43Z</td>
-          <td>25/45</td>
-          <td>t02, t04, t07, t12, t13, t14</td>
-          <td>other: 8, required refs: 8, invalid refs: 4</td>
-        </tr>
-        
             </tbody>
           </table>
         </div>
@@ -470,9 +470,9 @@
           <h3>Что делать дальше</h3>
           <p>Сейчас агент уверенно проходит только часть ECOM1. Основной резерв лежит не в одном месте, а в стыке shopper SQL discovery, refs hardening и outcome routing для support/checkout сценариев.</p>
           <div class="tag-row">
-            <div class="tag">Latest full score: 48.75%</div>
-            <div class="tag">Passed: 23</div>
-            <div class="tag">Failed: 27</div>
+            <div class="tag">Latest full score: 39.67%</div>
+            <div class="tag">Passed: 19</div>
+            <div class="tag">Failed: 31</div>
           </div>
           <ul>
             <li>Добить shopper SQL-поиск на узких product-properties, когда первая выборка ошибочно возвращает 0 строк.</li>
