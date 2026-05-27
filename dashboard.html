@@ -330,33 +330,33 @@
         Автогенерируемый дашборд по локальным логам. Показывает текущий статус benchmark, структуру рантайма агента, динамику full-runs и ближайшие инженерные шаги.
       </div>
       <div class="meta">
-        <div class="meta-chip">Latest full run: 2026-05-24T17-35-57Z</div>
+        <div class="meta-chip">Latest full run: 2026-05-27T05-50-24Z</div>
         <div class="meta-chip">Model: gpt-5.3-codex</div>
         <div class="meta-chip">Auth: codex-cli:chatgpt-oauth</div>
-        <div class="meta-chip">Benchmark size: 44</div>
+        <div class="meta-chip">Benchmark size: 48</div>
       </div>
       <div class="stats">
         <article class="stat">
           <div class="stat-label">Best Full Pass</div>
-          <div class="stat-value">13/44</div>
-          <div class="bar"><span style="width:29.55%"></span></div>
+          <div class="stat-value">27/44</div>
+          <div class="bar"><span style="width:61.36%"></span></div>
           <div class="stat-note">Лучший зафиксированный full-run в локальных логах.</div>
         </article>
         <article class="stat">
           <div class="stat-label">Latest Full Pass</div>
-          <div class="stat-value">13/44</div>
-          <div class="bar"><span style="width:29.55%"></span></div>
+          <div class="stat-value">24/48</div>
+          <div class="bar"><span style="width:50.00%"></span></div>
           <div class="stat-note">Последний завершённый полный прогон benchmark.</div>
         </article>
         <article class="stat">
           <div class="stat-label">Open Failures</div>
-          <div class="stat-value">31</div>
-          <div class="stat-note">Неуспешные задачи в последнем full-run. Top list: t02, t09, t10, t11, t12, t13, t14, t15</div>
+          <div class="stat-value">24</div>
+          <div class="stat-note">Неуспешные задачи в последнем full-run. Top list: t02, t04, t05, t10, t12, t13, t14, t15</div>
         </article>
         <article class="stat">
           <div class="stat-label">Failure Mix</div>
           <div class="stat-value">5</div>
-          <div class="stat-note">Ключевые паттерны: required refs: 17, early clarification: 6, unsupported routing: 4, invalid refs: 2</div>
+          <div class="stat-note">Ключевые паттерны: required refs: 13, other: 4, invalid refs: 3, outcome mismatch: 3</div>
         </article>
       </div>
     </section>
@@ -425,10 +425,42 @@
             <tbody>
               
         <tr>
-          <td>2026-05-24T17-35-57Z</td>
-          <td>13/44</td>
-          <td>t02, t09, t10, t11, t12, t13</td>
-          <td>required refs: 17, early clarification: 6, unsupported routing: 4</td>
+          <td>2026-05-27T05-50-24Z</td>
+          <td>24/45</td>
+          <td>t02, t04, t05, t10, t12, t13</td>
+          <td>required refs: 13, other: 4, invalid refs: 3</td>
+        </tr>
+        
+
+        <tr>
+          <td>2026-05-27T04-02-33Z</td>
+          <td>23/46</td>
+          <td>t04, t07, t10, t11, t12, t13</td>
+          <td>required refs: 11, other: 6, invalid refs: 5</td>
+        </tr>
+        
+
+        <tr>
+          <td>2026-05-26T21-44-22Z</td>
+          <td>15/45</td>
+          <td>t03, t07, t09, t12, t13, t14</td>
+          <td>outcome mismatch: 8, required refs: 7, security routing: 6</td>
+        </tr>
+        
+
+        <tr>
+          <td>2026-05-26T21-05-43Z</td>
+          <td>25/45</td>
+          <td>t02, t04, t07, t12, t13, t14</td>
+          <td>other: 8, required refs: 8, invalid refs: 4</td>
+        </tr>
+        
+
+        <tr>
+          <td>2026-05-26T19-44-30Z</td>
+          <td>22/45</td>
+          <td>t03, t04, t07, t08, t10, t12</td>
+          <td>other: 10, invalid refs: 6, required refs: 4</td>
         </tr>
         
             </tbody>
@@ -438,9 +470,9 @@
           <h3>Что делать дальше</h3>
           <p>Сейчас агент уверенно проходит только часть ECOM1. Основной резерв лежит не в одном месте, а в стыке shopper SQL discovery, refs hardening и outcome routing для support/checkout сценариев.</p>
           <div class="tag-row">
-            <div class="tag">Latest full score: 29.55%</div>
-            <div class="tag">Passed: 13</div>
-            <div class="tag">Failed: 31</div>
+            <div class="tag">Latest full score: 53.42%</div>
+            <div class="tag">Passed: 24</div>
+            <div class="tag">Failed: 24</div>
           </div>
           <ul>
             <li>Добить shopper SQL-поиск на узких product-properties, когда первая выборка ошибочно возвращает 0 строк.</li>

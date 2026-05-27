@@ -41,7 +41,8 @@ def safe_console_text(text: str) -> str:
 
 def console_print(*args, **kwargs) -> None:
     kwargs.setdefault("flush", True)
-    print(*args, **kwargs)
+    safe_args = tuple(safe_console_text(str(arg)) for arg in args)
+    print(*safe_args, **kwargs)
 
 
 def main() -> None:
@@ -74,6 +75,7 @@ def main() -> None:
         console_print(f"Model auth source: {describe_model_auth_source()}")
         console_print(f"Resolved model id: {get_model_id()}")
         console_print(f"Run logs: {log_manager.session_dir}")
+        console_print(f"Error logs: {log_manager.errors_dir}")
         log_manager.run_log.log(f"Model auth source: {describe_model_auth_source()}")
         log_manager.run_log.log(f"Resolved model id: {get_model_id()}")
 

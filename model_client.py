@@ -44,6 +44,52 @@ class OpenAIChatClient:
         return response.choices[0].message.parsed
 
 
+def _is_usage_limit_error(error: Exception) -> bool:
+    text = str(error).lower()
+    markers = (
+        "usage limit",
+        "rate limit",
+        "quota",
+        "insufficient_quota",
+        "try again at",
+        "purchase more credits",
+    )
+    return any(marker in text for marker in markers)
+
+
+class FallbackStructuredClient:
+    def __init__(self, primary: StructuredModelClient, fallback: StructuredModelClient) -> None:
+        self.primary = primary
+        self.fallback = fallback
+
+    def parse_structured(
+        self,
+        messages: list[dict],
+        response_model: type[BaseModel],
+        model: str,
+        max_completion_tokens: int = 16384,
+    ) -> BaseModel:
+        try:
+            return self.primary.parse_structured(
+                messages=messages,
+                response_model=response_model,
+                model=model,
+                max_completion_tokens=max_completion_tokens,
+            )
+        except Exception as exc:
+            if not _is_usage_limit_error(exc):
+                raise
+
+            # For codex_oauth overloads/limits we transparently retry via api_key
+            # with MODEL_ID routing (e.g. router-compatible providers).
+            return self.fallback.parse_structured(
+                messages=messages,
+                response_model=response_model,
+                model=os.getenv("MODEL_ID") or model,
+                max_completion_tokens=max_completion_tokens,
+            )
+
+
 def get_model_adapter() -> str:
     adapter = (os.getenv("MODEL_ADAPTER") or "api_key").strip().lower()
     if adapter == "openai_sdk":
@@ -87,7 +133,16 @@ def validate_model_configuration() -> None:
 def create_structured_model_client() -> StructuredModelClient:
     adapter = get_model_adapter()
     if adapter == "codex_oauth":
-        return CodexOAuthClient()
+        primary = CodexOAuthClient()
+        fallback_enabled = (os.getenv("ENABLE_MODEL_FALLBACK") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if fallback_enabled and has_openai_credentials():
+            return FallbackStructuredClient(primary=primary, fallback=OpenAIChatClient())
+        return primary
     return OpenAIChatClient()
 
 
